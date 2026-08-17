@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>제주하루 | 제주 하루 여행 동선 만들기</title>
+    <meta name="description" content="가고 싶은 제주 관광지를 고르면 하루 방문 일정과 이동 동선을 보여주는 여행 플래너" />
+    <link rel="preconnect" href="https://unpkg.com" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <header class="topbar">
+        <a class="brand" href="#top"><span class="brand-mark">ㅎ</span><span>제주하루</span></a>
+        <div class="stepper"><span class="step active" id="selection-step"><b>1</b> 장소 고르기</span><span class="step-line"></span><span class="step" id="result-step"><b>2</b> 일정 확인</span></div>
+        <span class="year-chip">2026 제주 한정</span>
+      </header>
+
+      <section class="workspace" id="top">
+        <aside class="planner-panel">
+          <div class="planner-heading">
+            <p class="eyebrow">나만의 제주 하루</p>
+            <h1>가고 싶은 곳만 콕.<br />하루 동선은 착착.</h1>
+            <p>날짜와 장소를 고르면 이동하기 편한 일정으로 정리해드려요.</p>
+          </div>
+
+          <div class="setup-card">
+            <div class="field-group">
+              <label for="travel-date">여행 날짜</label>
+              <div class="date-row"><input id="travel-date" type="date" min="2026-01-01" max="2026-12-31" value="2026-08-18" /><span class="weekday" id="weekday"></span></div>
+            </div>
+            <div class="field-group time-pair">
+              <div><label for="start-time">출발 시간</label><input id="start-time" type="time" value="09:00" /></div>
+              <div><label for="end-time">종료 희망</label><input id="end-time" type="time" value="19:00" /></div>
+            </div>
+            <div class="field-group start-field">
+              <div><label>출발지</label><p id="start-name">제주국제공항</p></div>
+              <button type="button" class="airport-button" id="airport-button">✈️ 공항으로</button>
+            </div>
+            <p class="map-hint">지도에서 원하는 위치를 누르면 출발지가 바뀌어요.</p>
+          </div>
+
+          <div class="spot-section">
+            <div class="section-title-row">
+              <div><h2>어디를 가볼까요?</h2><p>최소 2곳, 최대 6곳을 골라주세요.</p></div>
+              <strong class="count" id="count">0<span>/6</span></strong>
+            </div>
+            <label class="search-box"><span>⌕</span><input id="search" placeholder="관광지 이름이나 특징 검색" /><button type="button" id="clear-search" aria-label="검색어 지우기">×</button></label>
+            <div class="region-chips" id="region-chips" aria-label="권역 필터"></div>
+            <div class="spot-list" id="spot-list"></div>
+          </div>
+        </aside>
+
+        <section class="map-panel" aria-label="제주 관광지 지도">
+          <div id="map" class="leaflet-map"></div>
+          <div class="map-title-card"><span class="tiny-pin">●</span><div><strong>지도에서도 바로 선택할 수 있어요</strong><p>마커를 누르면 장소 선택 · 빈 곳을 누르면 출발지 설정</p></div></div>
+          <div class="map-legend"><span><i class="start-dot"></i> 출발지</span><span><i class="route-dot"></i> 추천 후 경로</span></div>
+          <aside class="confirmed-panel hidden" id="confirmed-panel" aria-label="확정된 일정">
+            <div class="confirmed-panel-head">
+              <div><span class="confirmed-badge">✓ 확정된 일정입니다</span><strong id="confirmed-panel-title"></strong></div>
+              <button type="button" class="close-button small" id="confirmed-panel-close" aria-label="확정 패널 닫기">×</button>
+            </div>
+            <div class="confirmed-panel-body" id="confirmed-panel-body"></div>
+            <button type="button" class="confirmed-panel-detail" id="confirmed-panel-detail">자세히 다시 보기</button>
+          </aside>
+          <div class="route-bar" id="route-bar">
+            <div class="selection-stack" id="selection-stack"></div>
+            <div class="route-bar-copy"><strong id="route-title"></strong><span id="route-subtitle"></span></div>
+            <button type="button" id="preview-button" disabled>추천 일정 만들기 <span>→</span></button>
+          </div>
+        </section>
+      </section>
+    </main>
+
+    <div class="schedule-backdrop hidden" id="schedule-backdrop">
+      <section class="schedule-sheet" role="dialog" aria-modal="true" aria-labelledby="schedule-title">
+        <button class="close-button" type="button" id="close-schedule" aria-label="일정 닫기">×</button>
+        <p class="eyebrow">추천 일정 결과</p>
+        <h2 id="schedule-title"></h2>
+        <p class="schedule-intro">현재 화면에서는 출발지와 장소 사이의 거리를 비교해 이동하기 편한 순서를 시연합니다. 이후 팀의 경로·일정 알고리즘을 연결하면 실제 도로와 운영시간을 반영한 결과로 교체할 수 있어요.</p>
+        <p class="overtime-banner hidden" id="overtime-banner"></p>
+        <div class="summary-cards" id="summary-cards"></div>
+        <div class="timeline" id="timeline"></div>
+        <div class="alt-schedules hidden" id="alt-schedules">
+          <h3>다른 순서도 볼래요</h3>
+          <div class="alt-list" id="alt-list"></div>
+        </div>
+        <div class="schedule-actions">
+          <button type="button" class="primary-button" id="schedule-confirm">이 일정으로 확정하기</button>
+          <button type="button" class="secondary-button" id="schedule-done">장소 다시 선택하기</button>
+        </div>
+      </section>
+    </div>
+    <div class="toast hidden" id="toast" role="status"></div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+    <script src="data.js"></script>
+    <script src="app.js"></script>
+  </body>
+</html>

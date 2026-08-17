@@ -1,0 +1,10 @@
+# 절대 커밋하면 안 되는 파일 (API 키 등 비밀값)
+.env
+.env.local
+.env*.local
+
+# Vercel 로컬 개발용 폴더
+.vercel
+
+# OS/에디터 잡파일
+.DS_Store
