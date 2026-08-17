@@ -79,6 +79,10 @@ function loadState() {
     const saved = JSON.parse(raw);
     if (Array.isArray(saved.selectedIds)) {
       state.selectedIds = saved.selectedIds.filter((id) => SPOTS.some((spot) => spot.id === id));
+      // toggleSpot()을 거치지 않고 바로 복원하면 flowStartedAt이 안 찍혀서, 이 상태로
+      // 바로 확정/이탈해도 schedule_confirmed·schedule_dismissed KPI 이벤트가 안 잡히는
+      // 문제가 있어 여기서도 동일하게 기록해줍니다.
+      if (state.selectedIds.length) state.flowStartedAt = performance.now();
     }
     if (saved.startPoint && typeof saved.startPoint.lat === "number" && typeof saved.startPoint.lng === "number") {
       state.startPoint = saved.startPoint;
