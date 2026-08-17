@@ -191,6 +191,12 @@ function showToast(message) {
 function trackEvent(name, params = {}) {
   window.dataLayer = window.dataLayer || [];
   window.dataLayer.push({ event: name, ...params });
+  // index.html에 심어둔 gtag(GA4)로 실제 전송. GA 스크립트가 아직 없거나(로컬
+  // index.html 더블클릭 등) 차단됐으면 gtag가 없어서 조용히 건너뜀 — 위 dataLayer
+  // 누적은 그대로 유지되니 안전합니다.
+  if (typeof gtag === "function") {
+    gtag("event", name, params);
+  }
 }
 
 function updateDate() {
