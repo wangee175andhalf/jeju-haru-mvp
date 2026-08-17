@@ -49,6 +49,49 @@ const elements = {
 };
 
 // ---------------------------------------------------------------------------
+// 입력값 로컬 저장 (localStorage)
+// 계산된 일정 "결과"가 아니라, 사용자가 고른 "입력값"(장소, 출발지, 날짜/시간)만
+// 저장합니다. 이동시간·운영시간·날씨는 시시각각 바뀔 수 있어서, 새로고침 후에는
+// 이 입력값만 복원해두고 "추천 일정 만들기"를 다시 눌러야 그 시점의 최신 데이터로
+// 재계산됩니다. (자동 재계산은 하지 않음 — 네이버 API 일일 호출 한도를 아끼기 위해
+// 사용자가 명시적으로 버튼을 눌렀을 때만 호출되는 기존 방식을 그대로 유지)
+// ---------------------------------------------------------------------------
+const STORAGE_KEY = "jejuharu:inputs:v1";
+
+function saveState() {
+  try {
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify({
+      selectedIds: state.selectedIds,
+      startPoint: state.startPoint,
+      date: elements.date.value,
+      time: elements.time.value,
+      endTime: elements.endTime.value,
+    }));
+  } catch (error) {
+    // localStorage를 못 쓰는 환경(시크릿 모드 등)이면 조용히 저장을 건너뜀
+  }
+}
+
+function loadState() {
+  try {
+    const raw = window.localStorage.getItem(STORAGE_KEY);
+    if (!raw) return;
+    const saved = JSON.parse(raw);
+    if (Array.isArray(saved.selectedIds)) {
+      state.selectedIds = saved.selectedIds.filter((id) => SPOTS.some((spot) => spot.id === id));
+    }
+    if (saved.startPoint && typeof saved.startPoint.lat === "number" && typeof saved.startPoint.lng === "number") {
+      state.startPoint = saved.startPoint;
+    }
+    if (saved.date) elements.date.value = saved.date;
+    if (saved.time) elements.time.value = saved.time;
+    if (saved.endTime) elements.endTime.value = saved.endTime;
+  } catch (error) {
+    // 저장된 값이 손상됐거나 파싱에 실패해도 조용히 기본값으로 진행
+  }
+}
+
+// ---------------------------------------------------------------------------
 // 운영시간 파싱
 // data.js의 hours 필드는 "09:00~18:00" 같은 형태부터 "점포별 상이", "상시 개방" 같은
 // 자유 텍스트까지 섞여 있어요. 여기서는 HH:MM~HH:MM 패턴만 뽑아서 운영시간으로
@@ -154,6 +197,7 @@ function updateDate() {
   clearRecommendation();
   elements.weekday.textContent = weekdayText();
   renderAllSelections();
+  saveState();
 }
 
 function renderChips() {
@@ -197,6 +241,7 @@ function toggleSpot(id) {
   }
   clearRecommendation();
   renderAllSelections();
+  saveState();
 }
 
 function renderSpots() {
@@ -811,11 +856,12 @@ map.on("click", (event) => {
   renderStart();
   renderRoute();
   renderRouteBar();
+  saveState();
 });
 
 elements.date.addEventListener("change", updateDate);
-elements.time.addEventListener("change", () => { clearRecommendation(); renderAllSelections(); });
-elements.endTime.addEventListener("change", () => { clearRecommendation(); renderAllSelections(); });
+elements.time.addEventListener("change", () => { clearRecommendation(); renderAllSelections(); saveState(); });
+elements.endTime.addEventListener("change", () => { clearRecommendation(); renderAllSelections(); saveState(); });
 elements.search.addEventListener("input", () => {
   state.query = elements.search.value;
   elements.clearSearch.classList.toggle("visible", Boolean(state.query));
@@ -834,6 +880,7 @@ document.querySelector("#airport-button").addEventListener("click", () => {
   renderRoute();
   renderRouteBar();
   map.panTo([AIRPORT.lat, AIRPORT.lng]);
+  saveState();
 });
 elements.previewButton.addEventListener("click", createOrOpenSchedule);
 document.querySelector("#close-schedule").addEventListener("click", closeSchedule);
@@ -847,6 +894,7 @@ document.querySelector("#confirmed-panel-detail").addEventListener("click", reop
 elements.backdrop.addEventListener("click", (event) => { if (event.target === elements.backdrop) closeSchedule(); });
 document.addEventListener("keydown", (event) => { if (event.key === "Escape") closeSchedule(); });
 
+loadState();
 renderChips();
 updateDate();
 renderStart();
