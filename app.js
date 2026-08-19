@@ -143,7 +143,11 @@ function isClosedOn(spot, date) {
   return new RegExp(`매주\\s*${weekday}요일`).test(spot.closure || "");
 }
 
-const map = L.map("map", { zoomControl: false, minZoom: 9, maxZoom: 16 }).setView([33.382, 126.55], 10);
+// 모바일(좁은 화면)에서는 지도 세로 높이가 짧아져서 초기 확대 수준(10)을 그대로 쓰면
+// 제주 섬 위아래가 잘려 보이는 문제가 있어, 화면 폭에 따라 초기 확대를 한 단계
+// 낮춰(9) 섬 전체가 더 잘 들어오도록 조정합니다.
+const INITIAL_MAP_ZOOM = window.innerWidth <= 900 ? 9 : 10;
+const map = L.map("map", { zoomControl: false, minZoom: 8, maxZoom: 16 }).setView([33.382, 126.55], INITIAL_MAP_ZOOM);
 L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
   maxZoom: 19,
   attribution: "© OpenStreetMap contributors",
@@ -271,6 +275,7 @@ function renderSpots() {
             <span class="spot-title-line"><strong>${spot.name}</strong>${closed ? "<em>오늘 휴무</em>" : ""}</span>
             <span>${spot.region} · 약 ${spot.duration}분</span>
             <small>${spot.hours}</small>
+            <small class="spot-desc">${spot.description}</small>
           </span>
           <span class="checkmark">${selected ? "✓" : "+"}</span>
         </button>
@@ -378,9 +383,12 @@ function renderRouteBar() {
   } else {
     elements.routeTitle.textContent = selected.length >= 2 ? `${selected.length}곳을 선택했어요` : "장소를 2곳 이상 선택해주세요";
     elements.routeSubtitle.textContent = selected.length >= 2 ? "선택 순서와 관계없이 이동하기 편한 순서를 만들어드려요" : "선택 중에는 방문 순서와 경로가 표시되지 않아요";
-    elements.previewButton.innerHTML = state.isBuilding ? `일정 만드는 중…` : `추천 일정 만들기 <span>→</span>`;
+    elements.previewButton.innerHTML = state.isBuilding
+      ? `<span class="btn-spinner" aria-hidden="true"></span>일정 만드는 중…`
+      : `추천 일정 만들기 <span>→</span>`;
   }
   elements.previewButton.disabled = selected.length < 2 || state.isBuilding;
+  elements.previewButton.setAttribute("aria-busy", String(state.isBuilding));
   elements.routeBar.classList.toggle("ready", selected.length >= 2);
   elements.routeBar.classList.toggle("has-result", Boolean(state.recommendedIds.length));
   elements.selectionStep.classList.toggle("active", !state.recommendedIds.length);
@@ -724,14 +732,21 @@ function renderAlternatives() {
     const routeNames = alt.order.map((spot) => spot.name).join(" → ");
     const warn = alt.conflicts > 0 || alt.overEnd ? `<em>충돌 ${alt.conflicts + (alt.overEnd ? 1 : 0)}건</em>` : "";
     const reasonLine = alt.reason ? `<span class="alt-reason">${alt.reason}</span>` : "";
+    const distanceText = alt.totalDistanceKm !== undefined && alt.totalDistanceKm !== null
+      ? `${alt.totalDistanceKm.toFixed(1)}km`
+      : "-";
     return `
       <button type="button" class="alt-card ${isActive ? "active" : ""}" data-index="${index}">
-        <div>
+        <div class="alt-card-top">
           <strong>${index === 0 ? "추천 1순위" : `대안 ${index}`} · ${routeNames}</strong>
-          <span>이동 약 ${alt.totalTravel}분 · 종료 ${minutesToTime(alt.finish)}</span>
-          ${reasonLine}
+          ${warn}
         </div>
-        ${warn}
+        <div class="alt-card-stats">
+          <div><span>이동시간</span><strong>${alt.totalTravel}분</strong></div>
+          <div><span>이동거리</span><strong>${distanceText}</strong></div>
+          <div><span>종료시간</span><strong>${minutesToTime(alt.finish)}</strong></div>
+        </div>
+        ${reasonLine}
       </button>`;
   }).join("");
   elements.altSchedules.classList.remove("hidden");
@@ -821,6 +836,15 @@ function closeSchedule() {
 
 function confirmSchedule() {
   if (!state.scheduleResult) return;
+  // 지금 확정하려는 일정이 "이미 확정해둔 바로 그 일정"과 같은 경우(빠른 연타,
+  // 확정 후 재확인 화면에서 재클릭 등)에만 중복 방지로 조용히 무시합니다. 선택을
+  // 바꿔서 다른 조합으로 새로 확정하려는 경우(scheduleResult가 새로 계산된 다른
+  // 객체)는 정상적으로 진행되어야 하므로, 단순히 "확정한 적 있는지"가 아니라
+  // "이번 결과가 이미 확정된 그 결과와 같은 객체인지"로 판단합니다.
+  if (state.isConfirmed && state.confirmedSchedule === state.scheduleResult) {
+    closeSchedule();
+    return;
+  }
   if (state.flowStartedAt) {
     trackEvent("schedule_confirmed", {
       totalTimeMs: Math.round(performance.now() - state.flowStartedAt),
@@ -831,7 +855,7 @@ function confirmSchedule() {
   }
   state.isConfirmed = true;
   state.confirmedSchedule = state.scheduleResult;
-  showToast("이 일정으로 확정됐어요!");
+  showToast("이 일정으로 확정됐어요! 오른쪽 패널에서 언제든 다시 볼 수 있어요.");
   closeSchedule();
   renderConfirmedPanel();
 }
