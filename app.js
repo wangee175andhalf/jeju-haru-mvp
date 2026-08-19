@@ -853,6 +853,12 @@ function confirmSchedule() {
       usedPrimaryRecommendation: state.activeAlternativeIndex === 0,
     });
   }
+  // 여행지별로 몇 번 담겼는지(인기 순위) KPI를 위해, 확정된 일정에 포함된 장소마다
+  // 하나씩 별도 이벤트로 전송합니다. GA4는 하나의 이벤트 안에 배열 값을 담아
+  // 집계하기 어려워서, 장소 수만큼 이벤트를 나눠 보내는 방식을 씁니다.
+  state.scheduleResult.steps.forEach((step) => {
+    trackEvent("spot_included", { spotName: step.spot.name, spotRegion: step.spot.region });
+  });
   state.isConfirmed = true;
   state.confirmedSchedule = state.scheduleResult;
   showToast("이 일정으로 확정됐어요! 오른쪽 패널에서 언제든 다시 볼 수 있어요.");
